@@ -313,19 +313,11 @@ pub fn spawn_level(
                             // Note: entities do not seem to be affected visually by layer offsets in
                             // the editor, so no layer offset is added to the transform here.
 
-                            let (tileset, tileset_definition) = match &entity_instance.tile {
-                                Some(t) => (
-                                    tileset_map.get(&t.tileset_uid),
-                                    tileset_definition_map.get(&t.tileset_uid).copied(),
-                                ),
-                                None => (None, None),
-                            };
-
                             let predicted_worldly = Worldly::bundle_entity(LdtkEntityContext {
                                 entity_instance,
                                 layer_instance,
-                                tileset,
-                                tileset_definition,
+                                tileset_map,
+                                tileset_definition_map,
                                 asset_server,
                                 texture_atlases,
                             });
@@ -346,8 +338,8 @@ pub fn spawn_level(
                                     LdtkEntityContext {
                                         entity_instance,
                                         layer_instance,
-                                        tileset,
-                                        tileset_definition,
+                                        tileset_map,
+                                        tileset_definition_map,
                                         asset_server,
                                         texture_atlases,
                                     },

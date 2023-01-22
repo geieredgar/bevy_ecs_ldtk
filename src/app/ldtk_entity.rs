@@ -1,7 +1,7 @@
 use crate::{
     components::{EntityInstanceBundle, GridCoords, Worldly},
     ldtk::{EntityInstance, LayerInstance, TilesetDefinition},
-    utils,
+    utils, TilesetMap,
 };
 use bevy::{ecs::system::EntityCommands, prelude::*};
 use std::{collections::HashMap, marker::PhantomData};
@@ -302,8 +302,8 @@ pub trait LdtkEntity {
 pub struct LdtkEntityContext<'a> {
     pub entity_instance: &'a EntityInstance,
     pub layer_instance: &'a LayerInstance,
-    pub tileset: Option<&'a Handle<Image>>,
-    pub tileset_definition: Option<&'a TilesetDefinition>,
+    pub tileset_map: &'a TilesetMap,
+    pub tileset_definition_map: &'a HashMap<i32, &'a TilesetDefinition>,
     pub asset_server: &'a AssetServer,
     pub texture_atlases: &'a mut Assets<TextureAtlas>,
 }
@@ -313,8 +313,8 @@ impl<'a> LdtkEntityContext<'a> {
         LdtkEntityContext {
             entity_instance: self.entity_instance,
             layer_instance: self.layer_instance,
-            tileset: self.tileset,
-            tileset_definition: self.tileset_definition,
+            tileset_map: self.tileset_map,
+            tileset_definition_map: self.tileset_definition_map,
             asset_server: self.asset_server,
             texture_atlases: self.texture_atlases,
         }
@@ -331,7 +331,7 @@ impl LdtkEntity for EntityInstanceBundle {
 
 impl LdtkEntity for SpriteBundle {
     fn bundle_entity(context: LdtkEntityContext) -> Self {
-        utils::sprite_bundle_from_entity_info(context.tileset)
+        utils::sprite_bundle_from_entity_info(context.entity_instance, context.tileset_map)
     }
 }
 
@@ -339,8 +339,8 @@ impl LdtkEntity for SpriteSheetBundle {
     fn bundle_entity(context: LdtkEntityContext) -> Self {
         utils::sprite_sheet_bundle_from_entity_info(
             context.entity_instance,
-            context.tileset,
-            context.tileset_definition,
+            context.tileset_map,
+            context.tileset_definition_map,
             context.texture_atlases,
         )
     }
