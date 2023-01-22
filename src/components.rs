@@ -1,11 +1,15 @@
 //! [Component]s and [Bundle]s used by the plugin.
 
 pub use crate::ldtk::EntityInstance;
-use crate::ldtk::{LayerInstance, Type};
+use crate::{
+    ldtk::{LayerInstance, Type},
+    prelude::TilesetDefinition,
+    LdtkAsset,
+};
 use bevy::prelude::*;
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign},
 };
 
@@ -331,6 +335,47 @@ impl From<&LayerInstance> for LayerMetadata {
 #[reflect(Component)]
 pub struct Respawn;
 
+#[derive(Clone, Default, Component)]
+pub struct TextureAtlasCache(Option<HashMap<i32, (TilesetDefinition, Handle<TextureAtlas>)>>);
+
+impl TextureAtlasCache {
+    pub fn get(&self) -> Option<&HashMap<i32, (TilesetDefinition, Handle<TextureAtlas>)>> {
+        self.0.as_ref()
+    }
+
+    pub fn create(
+        &mut self,
+        ldtk_asset: &LdtkAsset,
+        asset_store: &mut Assets<TextureAtlas>,
+    ) -> &HashMap<i32, (TilesetDefinition, Handle<TextureAtlas>)> {
+        self.0 = Some(
+            ldtk_asset
+                .project
+                .defs
+                .tilesets
+                .iter()
+                .map(|t| {
+                    (
+                        t.uid,
+                        (
+                            t.clone(),
+                            asset_store.add(TextureAtlas::from_grid(
+                                ldtk_asset.tileset_map[&t.uid].clone(),
+                                Vec2::new(t.tile_grid_size as f32, t.tile_grid_size as f32),
+                                t.c_wid as usize,
+                                t.c_hei as usize,
+                                Some(Vec2::splat(t.spacing as f32)),
+                                Some(Vec2::splat(t.padding as f32)),
+                            )),
+                        ),
+                    )
+                })
+                .collect(),
+        );
+        self.0.as_ref().unwrap()
+    }
+}
+
 #[derive(Copy, Clone, Debug, Default, Bundle)]
 pub(crate) struct TileGridBundle {
     #[bundle]
@@ -370,4 +415,5 @@ pub struct LdtkWorldBundle {
     pub global_transform: GlobalTransform,
     pub visibility: Visibility,
     pub computed_visibility: ComputedVisibility,
+    pub texture_atlas_cache: TextureAtlasCache,
 }

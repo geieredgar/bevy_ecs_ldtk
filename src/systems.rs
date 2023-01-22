@@ -4,7 +4,6 @@ use crate::{
     app::{LdtkEntityMap, LdtkIntCellMap},
     assets::{LdtkAsset, LdtkLevel},
     components::*,
-    ldtk::TilesetDefinition,
     level::spawn_level,
     resources::{LdtkSettings, LevelEvent, LevelSelection, LevelSpawnBehavior, SetClearColor},
     utils::*,
@@ -218,7 +217,7 @@ pub fn process_ldtk_levels(
     level_assets: Res<Assets<LdtkLevel>>,
     ldtk_entity_map: NonSend<LdtkEntityMap>,
     ldtk_int_cell_map: NonSend<LdtkIntCellMap>,
-    ldtk_query: Query<&Handle<LdtkAsset>>,
+    mut ldtk_query: Query<(&Handle<LdtkAsset>, &mut TextureAtlasCache)>,
     level_query: Query<
         (
             Entity,
@@ -246,16 +245,13 @@ pub fn process_ldtk_levels(
         let already_processed = matches!(children, Some(children) if !children.is_empty());
 
         if !already_processed {
-            if let Ok(ldtk_handle) = ldtk_query.get(parent.get()) {
+            if let Ok((ldtk_handle, mut texture_atlas_cache)) = ldtk_query.get_mut(parent.get()) {
                 if let Some(ldtk_asset) = ldtk_assets.get(ldtk_handle) {
                     // Commence the spawning
-                    let tileset_definition_map: HashMap<i32, &TilesetDefinition> = ldtk_asset
-                        .project
-                        .defs
-                        .tilesets
-                        .iter()
-                        .map(|t| (t.uid, t))
-                        .collect();
+                    let texture_atlas_map = match texture_atlas_cache.get() {
+                        Some(v) => v,
+                        None => texture_atlas_cache.create(ldtk_asset, &mut texture_atlases),
+                    };
 
                     let entity_definition_map =
                         create_entity_definition_map(&ldtk_asset.project.defs.entities);
@@ -277,7 +273,7 @@ pub fn process_ldtk_levels(
                             &entity_definition_map,
                             &layer_definition_map,
                             &ldtk_asset.tileset_map,
-                            &tileset_definition_map,
+                            texture_atlas_map,
                             worldly_set,
                             ldtk_entity,
                             &ldtk_settings,

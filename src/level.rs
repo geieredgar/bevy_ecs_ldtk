@@ -211,7 +211,7 @@ pub fn spawn_level(
     entity_definition_map: &HashMap<i32, &EntityDefinition>,
     layer_definition_map: &HashMap<i32, &LayerDefinition>,
     tileset_map: &TilesetMap,
-    tileset_definition_map: &HashMap<i32, &TilesetDefinition>,
+    texture_atlas_map: &HashMap<i32, (TilesetDefinition, Handle<TextureAtlas>)>,
     worldly_set: HashSet<Worldly>,
     ldtk_entity: Entity,
     ldtk_settings: &LdtkSettings,
@@ -317,7 +317,7 @@ pub fn spawn_level(
                                 entity_instance,
                                 layer_instance,
                                 tileset_map,
-                                tileset_definition_map,
+                                texture_atlas_map,
                                 asset_server,
                                 texture_atlases,
                             });
@@ -339,7 +339,7 @@ pub fn spawn_level(
                                         entity_instance,
                                         layer_instance,
                                         tileset_map,
-                                        tileset_definition_map,
+                                        texture_atlas_map,
                                         asset_server,
                                         texture_atlases,
                                     },
@@ -369,7 +369,7 @@ pub fn spawn_level(
 
                     let tileset_definition = layer_instance
                         .tileset_def_uid
-                        .map(|u| tileset_definition_map.get(&u).unwrap());
+                        .map(|u| &texture_atlas_map.get(&u).unwrap().0);
 
                     let tile_size = match tileset_definition {
                         Some(tileset_definition) => TilemapTileSize {

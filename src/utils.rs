@@ -311,28 +311,11 @@ where
 /// See [LdtkEntity#sprite_sheet_bundle] for more info.
 pub fn sprite_sheet_bundle_from_tile_info(
     tile: Option<&TilesetRectangle>,
-    tileset_map: &TilesetMap,
-    tileset_definition_map: &HashMap<i32, &TilesetDefinition>,
-    texture_atlases: &mut Assets<TextureAtlas>,
+    texture_atlas_map: &HashMap<i32, (TilesetDefinition, Handle<TextureAtlas>)>,
 ) -> SpriteSheetBundle {
-    let (tileset, tileset_definition) = if let Some(t) = tile {
-        (
-            tileset_map.get(&t.tileset_uid),
-            tileset_definition_map.get(&t.tileset_uid).copied(),
-        )
-    } else {
-        (None, None)
-    };
-    match (tileset, tile, tileset_definition) {
-        (Some(tileset), Some(tile), Some(tileset_definition)) => SpriteSheetBundle {
-            texture_atlas: texture_atlases.add(TextureAtlas::from_grid(
-                tileset.clone(),
-                Vec2::new(tile.w as f32, tile.h as f32),
-                tileset_definition.c_wid as usize,
-                tileset_definition.c_hei as usize,
-                Some(Vec2::splat(tileset_definition.spacing as f32)),
-                Some(Vec2::splat(tileset_definition.padding as f32)),
-            )),
+    match tile.zip(tile.and_then(|t| texture_atlas_map.get(&t.tileset_uid))) {
+        Some((tile, (tileset_definition, texture_atlas))) => SpriteSheetBundle {
+            texture_atlas: texture_atlas.clone(),
             sprite: TextureAtlasSprite {
                 index: (tile.y / (tile.h + tileset_definition.spacing)) as usize
                     * tileset_definition.c_wid as usize

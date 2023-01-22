@@ -303,7 +303,7 @@ pub struct LdtkEntityContext<'a> {
     pub entity_instance: &'a EntityInstance,
     pub layer_instance: &'a LayerInstance,
     pub tileset_map: &'a TilesetMap,
-    pub tileset_definition_map: &'a HashMap<i32, &'a TilesetDefinition>,
+    pub texture_atlas_map: &'a HashMap<i32, (TilesetDefinition, Handle<TextureAtlas>)>,
     pub asset_server: &'a AssetServer,
     pub texture_atlases: &'a mut Assets<TextureAtlas>,
 }
@@ -314,7 +314,7 @@ impl<'a> LdtkEntityContext<'a> {
             entity_instance: self.entity_instance,
             layer_instance: self.layer_instance,
             tileset_map: self.tileset_map,
-            tileset_definition_map: self.tileset_definition_map,
+            texture_atlas_map: self.texture_atlas_map,
             asset_server: self.asset_server,
             texture_atlases: self.texture_atlases,
         }
@@ -342,9 +342,7 @@ impl LdtkEntity for SpriteSheetBundle {
     fn bundle_entity(context: LdtkEntityContext) -> Self {
         utils::sprite_sheet_bundle_from_tile_info(
             context.entity_instance.tile.as_ref(),
-            context.tileset_map,
-            context.tileset_definition_map,
-            context.texture_atlases,
+            context.texture_atlas_map,
         )
     }
 }
