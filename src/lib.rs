@@ -219,7 +219,7 @@ pub mod prelude {
     //! `use bevy_ecs_ldtk::prelude::*;` to import commonly used items.
 
     pub use crate::{
-        app::{LdtkEntity, LdtkIntCell, RegisterLdtkObjects},
+        app::{LdtkEntity, LdtkEntityContext, LdtkIntCell, RegisterLdtkObjects},
         assets::{LdtkAsset, LdtkLevel},
         components::{
             EntityInstance, GridCoords, IntGridCell, LayerMetadata, LdtkWorldBundle, LevelSet,

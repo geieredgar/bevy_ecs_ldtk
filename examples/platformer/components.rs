@@ -167,23 +167,20 @@ pub struct Patrol {
 }
 
 impl LdtkEntity for Patrol {
-    fn bundle_entity(
-        entity_instance: &EntityInstance,
-        layer_instance: &LayerInstance,
-        _: Option<&Handle<Image>>,
-        _: Option<&TilesetDefinition>,
-        _: &AssetServer,
-        _: &mut Assets<TextureAtlas>,
-    ) -> Patrol {
+    fn bundle_entity(context: LdtkEntityContext) -> Patrol {
         let mut points = Vec::new();
         points.push(ldtk_pixel_coords_to_translation_pivoted(
-            entity_instance.px,
-            layer_instance.c_hei * layer_instance.grid_size,
-            IVec2::new(entity_instance.width, entity_instance.height),
-            entity_instance.pivot,
+            context.entity_instance.px,
+            context.layer_instance.c_hei * context.layer_instance.grid_size,
+            IVec2::new(
+                context.entity_instance.width,
+                context.entity_instance.height,
+            ),
+            context.entity_instance.pivot,
         ));
 
-        let ldtk_patrol = entity_instance
+        let ldtk_patrol = context
+            .entity_instance
             .field_instances
             .iter()
             .find(|f| f.identifier == *"patrol")
@@ -197,13 +194,16 @@ impl LdtkEntity for Patrol {
                     // but technically they're not if you consider the pivot,
                     // which is at the bottom-center for the skulls.
                     let pixel_coords = (ldtk_point.as_vec2() + Vec2::new(0.5, 1.))
-                        * Vec2::splat(layer_instance.grid_size as f32);
+                        * Vec2::splat(context.layer_instance.grid_size as f32);
 
                     points.push(ldtk_pixel_coords_to_translation_pivoted(
                         pixel_coords.as_ivec2(),
-                        layer_instance.c_hei * layer_instance.grid_size,
-                        IVec2::new(entity_instance.width, entity_instance.height),
-                        entity_instance.pivot,
+                        context.layer_instance.c_hei * context.layer_instance.grid_size,
+                        IVec2::new(
+                            context.entity_instance.width,
+                            context.entity_instance.height,
+                        ),
+                        context.entity_instance.pivot,
                     ));
                 }
             }

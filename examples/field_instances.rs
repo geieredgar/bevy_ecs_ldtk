@@ -30,16 +30,9 @@ struct EntityWithFieldsBundle {
 }
 
 impl LdtkEntity for EntityWithFieldsBundle {
-    fn bundle_entity(
-        entity_instance: &EntityInstance,
-        _: &LayerInstance,
-        _: Option<&Handle<Image>>,
-        _: Option<&TilesetDefinition>,
-        _: &AssetServer,
-        _: &mut Assets<TextureAtlas>,
-    ) -> EntityWithFieldsBundle {
+    fn bundle_entity(context: LdtkEntityContext) -> EntityWithFieldsBundle {
         println!("EntityWithFields added, here are some facts:");
-        for field_instance in &entity_instance.field_instances {
+        for field_instance in &context.entity_instance.field_instances {
             println!(
                 "    its {} {}",
                 field_instance.identifier,
@@ -51,7 +44,8 @@ impl LdtkEntity for EntityWithFieldsBundle {
             custom_size: Some(Vec2::splat(16.)),
             ..Default::default()
         };
-        if let Some(color_field) = entity_instance
+        if let Some(color_field) = context
+            .entity_instance
             .field_instances
             .iter()
             .find(|f| f.identifier == *"Color")

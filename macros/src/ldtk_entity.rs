@@ -107,14 +107,7 @@ pub fn expand_ldtk_entity_derive(ast: &syn::DeriveInput) -> proc_macro::TokenStr
 
     let gen = quote! {
         impl #impl_generics bevy_ecs_ldtk::prelude::LdtkEntity for #struct_name #ty_generics #where_clause {
-            fn bundle_entity(
-                entity_instance: &bevy_ecs_ldtk::prelude::EntityInstance,
-                layer_instance: &bevy_ecs_ldtk::prelude::LayerInstance,
-                tileset: Option<&bevy::prelude::Handle<bevy::prelude::Image>>,
-                tileset_definition: Option<&bevy_ecs_ldtk::prelude::TilesetDefinition>,
-                asset_server: &bevy::prelude::AssetServer,
-                texture_atlases: &mut bevy::prelude::Assets<bevy::prelude::TextureAtlas>,
-            ) -> Self {
+            fn bundle_entity(mut context: bevy_ecs_ldtk::prelude::LdtkEntityContext) -> Self {
                 Self {
                     #(#field_constructions)*
                 }
@@ -152,7 +145,7 @@ fn expand_sprite_bundle_attribute(
 
                     quote! {
                         #field_name: bevy::prelude::SpriteBundle {
-                            texture: asset_server.load(#asset_path),
+                            texture: context.asset_server.load(#asset_path),
                             ..Default::default()
                         },
                     }
@@ -162,7 +155,7 @@ fn expand_sprite_bundle_attribute(
         },
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: bevy_ecs_ldtk::utils::sprite_bundle_from_entity_info(tileset),
+                #field_name: bevy_ecs_ldtk::utils::sprite_bundle_from_entity_info(context.tileset),
             }
         },
         _ => panic!("#[sprite_bundle...] attribute should take the form #[sprite_bundle(\"asset/path.png\")] or #[sprite_bundle]"),
@@ -228,9 +221,9 @@ fn expand_sprite_sheet_bundle_attribute(
 
             quote! {
                 #field_name: bevy::prelude::SpriteSheetBundle {
-                    texture_atlas: texture_atlases.add(
+                    texture_atlas: context.texture_atlases.add(
                         bevy::prelude::TextureAtlas::from_grid(
-                            asset_server.load(#asset_path).into(),
+                            context.asset_server.load(#asset_path).into(),
                             bevy::prelude::Vec2::new(#tile_width, #tile_height),
                             #columns, #rows, Some(bevy::prelude::Vec2::splat(#padding)),
                             Some(bevy::prelude::Vec2::splat(#offset)),
@@ -246,7 +239,7 @@ fn expand_sprite_sheet_bundle_attribute(
         },
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: bevy_ecs_ldtk::utils::sprite_sheet_bundle_from_entity_info(entity_instance, tileset, tileset_definition, texture_atlases),
+                #field_name: bevy_ecs_ldtk::utils::sprite_sheet_bundle_from_entity_info(context.entity_instance, context.tileset, context.tileset_definition, context.texture_atlases),
             }
         },
         _ => panic!("#[sprite_sheet_bundle...] attribute should take the form #[sprite_sheet_bundle(\"asset/path.png\", tile_width, tile_height, columns, rows, padding, offset, index)] or #[sprite_sheet_bundle]"),
@@ -264,7 +257,7 @@ fn expand_worldly_attribute(
     {
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: bevy_ecs_ldtk::prelude::Worldly::from_entity_info(entity_instance),
+                #field_name: bevy_ecs_ldtk::prelude::Worldly::from_entity_info(context.entity_instance),
             }
         }
         _ => panic!("#[worldly] attribute should take the form #[worldly]"),
@@ -282,7 +275,7 @@ fn expand_grid_coords_attribute(
     {
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: bevy_ecs_ldtk::prelude::GridCoords::from_entity_info(entity_instance, layer_instance),
+                #field_name: bevy_ecs_ldtk::prelude::GridCoords::from_entity_info(context.entity_instance, context.layer_instance),
             }
         }
         _ => panic!("#[grid_coords] attribute should take the form #[grid_coords]"),
@@ -300,7 +293,7 @@ fn expand_ldtk_entity_attribute(
     {
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: <#field_type as bevy_ecs_ldtk::prelude::LdtkEntity>::bundle_entity(entity_instance, layer_instance, tileset, tileset_definition, asset_server, texture_atlases),
+                #field_name: <#field_type as bevy_ecs_ldtk::prelude::LdtkEntity>::bundle_entity(context.reborrow()),
             }
         }
         _ => panic!("#[ldtk_entity] attribute should take the form #[ldtk_entity]"),
@@ -318,7 +311,7 @@ fn expand_from_entity_instance_attribute(
     {
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: <#field_type as From<&bevy_ecs_ldtk::prelude::EntityInstance>>::from(entity_instance),
+                #field_name: <#field_type as From<&bevy_ecs_ldtk::prelude::EntityInstance>>::from(context.entity_instance),
             }
         }
         _ => {
@@ -340,7 +333,7 @@ fn expand_with_attribute(
             match nested.first().unwrap() {
                 syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
                     quote! {
-                        #field_name: #path(entity_instance.clone()),
+                        #field_name: #path(context.entity_instance.clone()),
                     }
                 }
                 _ => panic!("Expected function as the only argument of #[with(...)]"),

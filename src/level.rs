@@ -2,8 +2,8 @@
 
 use crate::{
     app::{
-        LdtkEntity, LdtkEntityMap, LdtkIntCellMap, PhantomLdtkEntity, PhantomLdtkEntityTrait,
-        PhantomLdtkIntCell, PhantomLdtkIntCellTrait,
+        LdtkEntity, LdtkEntityContext, LdtkEntityMap, LdtkIntCellMap, PhantomLdtkEntity,
+        PhantomLdtkEntityTrait, PhantomLdtkIntCell, PhantomLdtkIntCellTrait,
     },
     assets::{LdtkLevel, TilesetMap},
     components::*,
@@ -321,14 +321,14 @@ pub fn spawn_level(
                                 None => (None, None),
                             };
 
-                            let predicted_worldly = Worldly::bundle_entity(
+                            let predicted_worldly = Worldly::bundle_entity(LdtkEntityContext {
                                 entity_instance,
                                 layer_instance,
                                 tileset,
                                 tileset_definition,
                                 asset_server,
                                 texture_atlases,
-                            );
+                            });
 
                             if !worldly_set.contains(&predicted_worldly) {
                                 let default_ldtk_entity: Box<dyn PhantomLdtkEntityTrait> =
@@ -343,12 +343,14 @@ pub fn spawn_level(
                                 )
                                 .evaluate(
                                     &mut entity_commands,
-                                    entity_instance,
-                                    layer_instance,
-                                    tileset,
-                                    tileset_definition,
-                                    asset_server,
-                                    texture_atlases,
+                                    LdtkEntityContext {
+                                        entity_instance,
+                                        layer_instance,
+                                        tileset,
+                                        tileset_definition,
+                                        asset_server,
+                                        texture_atlases,
+                                    },
                                 );
 
                                 entity_commands

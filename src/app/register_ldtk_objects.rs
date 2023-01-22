@@ -229,10 +229,7 @@ impl RegisterLdtkObjects for App {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        components::{EntityInstance, IntGridCell},
-        ldtk::{LayerInstance, TilesetDefinition},
-    };
+    use crate::{components::IntGridCell, ldtk::LayerInstance};
 
     #[derive(Default, Component, Debug)]
     struct ComponentA;
@@ -247,14 +244,7 @@ mod tests {
     }
 
     impl LdtkEntity for LdtkEntityBundle {
-        fn bundle_entity(
-            _: &EntityInstance,
-            _: &LayerInstance,
-            _: Option<&Handle<Image>>,
-            _: Option<&TilesetDefinition>,
-            _: &AssetServer,
-            _: &mut Assets<TextureAtlas>,
-        ) -> LdtkEntityBundle {
+        fn bundle_entity(_: LdtkEntityContext) -> LdtkEntityBundle {
             LdtkEntityBundle::default()
         }
     }

@@ -296,85 +296,65 @@ pub trait LdtkEntity {
     /// [SpatialBundle](bevy::prelude::SpatialBundle) to the entity **after** this bundle is
     /// inserted.
     /// So, any custom implementations of these components within this trait will be overwritten.
-    fn bundle_entity(
-        entity_instance: &EntityInstance,
-        layer_instance: &LayerInstance,
-        tileset: Option<&Handle<Image>>,
-        tileset_definition: Option<&TilesetDefinition>,
-        asset_server: &AssetServer,
-        texture_atlases: &mut Assets<TextureAtlas>,
-    ) -> Self;
+    fn bundle_entity(context: LdtkEntityContext) -> Self;
+}
+
+pub struct LdtkEntityContext<'a> {
+    pub entity_instance: &'a EntityInstance,
+    pub layer_instance: &'a LayerInstance,
+    pub tileset: Option<&'a Handle<Image>>,
+    pub tileset_definition: Option<&'a TilesetDefinition>,
+    pub asset_server: &'a AssetServer,
+    pub texture_atlases: &'a mut Assets<TextureAtlas>,
+}
+
+impl<'a> LdtkEntityContext<'a> {
+    pub fn reborrow(&mut self) -> LdtkEntityContext {
+        LdtkEntityContext {
+            entity_instance: self.entity_instance,
+            layer_instance: self.layer_instance,
+            tileset: self.tileset,
+            tileset_definition: self.tileset_definition,
+            asset_server: self.asset_server,
+            texture_atlases: self.texture_atlases,
+        }
+    }
 }
 
 impl LdtkEntity for EntityInstanceBundle {
-    fn bundle_entity(
-        entity_instance: &EntityInstance,
-        _: &LayerInstance,
-        _: Option<&Handle<Image>>,
-        _: Option<&TilesetDefinition>,
-        _: &AssetServer,
-        _: &mut Assets<TextureAtlas>,
-    ) -> Self {
+    fn bundle_entity(context: LdtkEntityContext) -> Self {
         EntityInstanceBundle {
-            entity_instance: entity_instance.clone(),
+            entity_instance: context.entity_instance.clone(),
         }
     }
 }
 
 impl LdtkEntity for SpriteBundle {
-    fn bundle_entity(
-        _: &EntityInstance,
-        _: &LayerInstance,
-        tileset: Option<&Handle<Image>>,
-        _: Option<&TilesetDefinition>,
-        _: &AssetServer,
-        _: &mut Assets<TextureAtlas>,
-    ) -> Self {
-        utils::sprite_bundle_from_entity_info(tileset)
+    fn bundle_entity(context: LdtkEntityContext) -> Self {
+        utils::sprite_bundle_from_entity_info(context.tileset)
     }
 }
 
 impl LdtkEntity for SpriteSheetBundle {
-    fn bundle_entity(
-        entity_instance: &EntityInstance,
-        _: &LayerInstance,
-        tileset: Option<&Handle<Image>>,
-        tileset_definition: Option<&TilesetDefinition>,
-        _: &AssetServer,
-        texture_atlases: &mut Assets<TextureAtlas>,
-    ) -> Self {
+    fn bundle_entity(context: LdtkEntityContext) -> Self {
         utils::sprite_sheet_bundle_from_entity_info(
-            entity_instance,
-            tileset,
-            tileset_definition,
-            texture_atlases,
+            context.entity_instance,
+            context.tileset,
+            context.tileset_definition,
+            context.texture_atlases,
         )
     }
 }
 
 impl LdtkEntity for Worldly {
-    fn bundle_entity(
-        entity_instance: &EntityInstance,
-        _: &LayerInstance,
-        _: Option<&Handle<Image>>,
-        _: Option<&TilesetDefinition>,
-        _: &AssetServer,
-        _: &mut Assets<TextureAtlas>,
-    ) -> Worldly {
-        Worldly::from_entity_info(entity_instance)
+    fn bundle_entity(context: LdtkEntityContext) -> Worldly {
+        Worldly::from_entity_info(context.entity_instance)
     }
 }
 
 impl LdtkEntity for GridCoords {
-    fn bundle_entity(
-        entity_instance: &EntityInstance,
-        layer_instance: &LayerInstance,
-        _: Option<&Handle<Image>>,
-        _: Option<&TilesetDefinition>,
-        _: &AssetServer,
-        _: &mut Assets<TextureAtlas>,
-    ) -> Self {
-        GridCoords::from_entity_info(entity_instance, layer_instance)
+    fn bundle_entity(context: LdtkEntityContext) -> Self {
+        GridCoords::from_entity_info(context.entity_instance, context.layer_instance)
     }
 }
 
@@ -396,12 +376,7 @@ pub trait PhantomLdtkEntityTrait {
     fn evaluate<'w, 's, 'a, 'b>(
         &self,
         commands: &'b mut EntityCommands<'w, 's, 'a>,
-        entity_instance: &EntityInstance,
-        layer_instance: &LayerInstance,
-        tileset: Option<&Handle<Image>>,
-        tileset_definition: Option<&TilesetDefinition>,
-        asset_server: &AssetServer,
-        texture_atlases: &mut Assets<TextureAtlas>,
+        context: LdtkEntityContext,
     ) -> &'b mut EntityCommands<'w, 's, 'a>;
 }
 
@@ -409,21 +384,9 @@ impl<B: LdtkEntity + Bundle> PhantomLdtkEntityTrait for PhantomLdtkEntity<B> {
     fn evaluate<'w, 's, 'a, 'b>(
         &self,
         entity_commands: &'b mut EntityCommands<'w, 's, 'a>,
-        entity_instance: &EntityInstance,
-        layer_instance: &LayerInstance,
-        tileset: Option<&Handle<Image>>,
-        tileset_definition: Option<&TilesetDefinition>,
-        asset_server: &AssetServer,
-        texture_atlases: &mut Assets<TextureAtlas>,
+        context: LdtkEntityContext,
     ) -> &'b mut EntityCommands<'w, 's, 'a> {
-        entity_commands.insert(B::bundle_entity(
-            entity_instance,
-            layer_instance,
-            tileset,
-            tileset_definition,
-            asset_server,
-            texture_atlases,
-        ))
+        entity_commands.insert(B::bundle_entity(context))
     }
 }
 
