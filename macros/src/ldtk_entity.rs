@@ -396,7 +396,7 @@ fn expand_with_attribute(
             match nested.first().unwrap() {
                 syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
                     quote! {
-                        #field_name: #path(context.entity_instance.clone()),
+                        #field_name: #path(context.entity_instance),
                     }
                 }
                 _ => panic!("Expected function as the only argument of #[with(...)]"),
