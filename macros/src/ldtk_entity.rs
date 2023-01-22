@@ -6,6 +6,7 @@ static WORLDLY_ATTRIBUTE_NAME: &str = "worldly";
 static GRID_COORDS_ATTRIBUTE_NAME: &str = "grid_coords";
 static LDTK_ENTITY_ATTRIBUTE_NAME: &str = "ldtk_entity";
 static FROM_ENTITY_INSTANCE_ATTRIBUTE_NAME: &str = "from_entity_instance";
+static LDTK_FIELD_ATTRIBUTE_NAME: &str = "ldtk_field";
 static WITH_ATTRIBUTE_NAME: &str = "with";
 
 pub fn expand_ldtk_entity_derive(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
@@ -83,6 +84,17 @@ pub fn expand_ldtk_entity_derive(ast: &syn::DeriveInput) -> proc_macro::TokenStr
             .find(|a| *a.path.get_ident().as_ref().unwrap() == FROM_ENTITY_INSTANCE_ATTRIBUTE_NAME);
         if let Some(attribute) = from_entity_instance {
             field_constructions.push(expand_from_entity_instance_attribute(
+                attribute, field_name, field_type,
+            ));
+            continue;
+        }
+
+        let ldtk_field = field
+            .attrs
+            .iter()
+            .find(|a| *a.path.get_ident().as_ref().unwrap() == LDTK_FIELD_ATTRIBUTE_NAME);
+        if let Some(attribute) = ldtk_field {
+            field_constructions.push(expand_ldtk_field_attribute(
                 attribute, field_name, field_type,
             ));
             continue;
@@ -316,6 +328,57 @@ fn expand_from_entity_instance_attribute(
         }
         _ => {
             panic!("#[from_entity_instance] attribute should take the form #[from_entity_instance]")
+        }
+    }
+}
+
+fn expand_ldtk_field_attribute(
+    attribute: &syn::Attribute,
+    field_name: &syn::Ident,
+    field_type: &syn::Type,
+) -> proc_macro2::TokenStream {
+    let (identifier, required) = match attribute
+        .parse_meta()
+        .expect("Cannot parse #[ldtk_field] attribute")
+    {
+        syn::Meta::Path(_) => (field_name.to_string(), false),
+        syn::Meta::NameValue(name_value) => match name_value {
+            syn::MetaNameValue {
+                lit: syn::Lit::Str(identifier),
+                ..
+            } => (identifier.value(), false),
+            _ => panic!("#[ldtk_field = ...] attribute only accepts string literals"),
+        },
+        syn::Meta::List(list) => {
+            let mut identifier = None;
+            let mut required = false;
+            for meta in list.nested {
+                match meta {
+                    syn::NestedMeta::Meta(syn::Meta::Path(path)) if path.is_ident("required") && !required => {
+                        required = true;
+                    },
+                    syn::NestedMeta::Lit(syn::Lit::Str(lit)) if identifier.is_none() => {
+                        identifier = Some(lit.value());
+                    }
+                    _ => panic!("#[ldtk_field(...)] attribute can contain at most one string literal and a 'required' entry")
+                }
+            }
+            (
+                identifier.unwrap_or_else(|| field_name.to_string()),
+                required,
+            )
+        }
+    };
+    if required {
+        let message = format!(
+            "EntityInstance does not contain a FieldInstance with identifier \"{identifier}\""
+        );
+        quote! {
+            #field_name: context.field(#identifier).map(<#field_type as bevy_ecs_ldtk::prelude::LdtkField>::bundle_field).expect(#message),
+        }
+    } else {
+        quote! {
+            #field_name: context.field(#identifier).map(<#field_type as bevy_ecs_ldtk::prelude::LdtkField>::bundle_field).unwrap_or_default(),
         }
     }
 }

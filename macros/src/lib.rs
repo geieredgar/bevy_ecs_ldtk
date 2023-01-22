@@ -12,6 +12,7 @@ mod ldtk_int_cell;
         grid_coords,
         ldtk_entity,
         from_entity_instance,
+        ldtk_field,
         with
     )
 )]

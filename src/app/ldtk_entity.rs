@@ -9,6 +9,8 @@ use std::{collections::HashMap, marker::PhantomData};
 #[allow(unused_imports)]
 use crate::app::register_ldtk_objects::RegisterLdtkObjects;
 
+use super::LdtkFieldContext;
+
 /// [Bundle]: bevy::prelude::Bundle
 /// [App]: bevy::prelude::App
 /// [Component]: bevy::prelude::Component
@@ -318,6 +320,23 @@ impl<'a> LdtkEntityContext<'a> {
             asset_server: self.asset_server,
             texture_atlases: self.texture_atlases,
         }
+    }
+
+    pub fn field(&mut self, identifier: &str) -> Option<LdtkFieldContext> {
+        for field_instance in &self.entity_instance.field_instances {
+            if field_instance.identifier == identifier {
+                return Some(LdtkFieldContext {
+                    field_instance,
+                    entity_instance: self.entity_instance,
+                    layer_instance: self.layer_instance,
+                    tileset_map: self.tileset_map,
+                    tileset_definition_map: self.tileset_definition_map,
+                    asset_server: self.asset_server,
+                    texture_atlases: self.texture_atlases,
+                });
+            }
+        }
+        None
     }
 }
 
