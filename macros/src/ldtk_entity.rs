@@ -155,7 +155,7 @@ fn expand_sprite_bundle_attribute(
         },
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: bevy_ecs_ldtk::utils::sprite_bundle_from_entity_info(context.entity_instance, context.tileset_map),
+                #field_name: bevy_ecs_ldtk::utils::sprite_bundle_from_tile_info(context.entity_instance.tile.as_ref(), context.tileset_map),
             }
         },
         _ => panic!("#[sprite_bundle...] attribute should take the form #[sprite_bundle(\"asset/path.png\")] or #[sprite_bundle]"),
@@ -239,7 +239,7 @@ fn expand_sprite_sheet_bundle_attribute(
         },
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: bevy_ecs_ldtk::utils::sprite_sheet_bundle_from_entity_info(context.entity_instance, context.tileset_map, context.tileset_definition_map, context.texture_atlases),
+                #field_name: bevy_ecs_ldtk::utils::sprite_sheet_bundle_from_tile_info(context.entity_instance.tile.as_ref(), context.tileset_map, context.tileset_definition_map, context.texture_atlases),
             }
         },
         _ => panic!("#[sprite_sheet_bundle...] attribute should take the form #[sprite_sheet_bundle(\"asset/path.png\", tile_width, tile_height, columns, rows, padding, offset, index)] or #[sprite_sheet_bundle]"),

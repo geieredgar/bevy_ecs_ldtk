@@ -331,14 +331,17 @@ impl LdtkEntity for EntityInstanceBundle {
 
 impl LdtkEntity for SpriteBundle {
     fn bundle_entity(context: LdtkEntityContext) -> Self {
-        utils::sprite_bundle_from_entity_info(context.entity_instance, context.tileset_map)
+        utils::sprite_bundle_from_tile_info(
+            context.entity_instance.tile.as_ref(),
+            context.tileset_map,
+        )
     }
 }
 
 impl LdtkEntity for SpriteSheetBundle {
     fn bundle_entity(context: LdtkEntityContext) -> Self {
-        utils::sprite_sheet_bundle_from_entity_info(
-            context.entity_instance,
+        utils::sprite_sheet_bundle_from_tile_info(
+            context.entity_instance.tile.as_ref(),
             context.tileset_map,
             context.tileset_definition_map,
             context.texture_atlases,

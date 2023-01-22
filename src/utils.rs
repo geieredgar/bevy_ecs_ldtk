@@ -304,18 +304,18 @@ where
     try_each_optional_permutation(a, b, |x, y| map.get(&(x, y))).unwrap_or(default)
 }
 
-/// Creates a [SpriteSheetBundle] from the entity information available to the
+/// Creates a [SpriteSheetBundle] from the tile information available to the
 /// [LdtkEntity::bundle_entity] method.
 ///
 /// Used for the `#[sprite_sheet_bundle]` attribute macro for `#[derive(LdtkEntity)]`.
 /// See [LdtkEntity#sprite_sheet_bundle] for more info.
-pub fn sprite_sheet_bundle_from_entity_info(
-    entity_instance: &EntityInstance,
+pub fn sprite_sheet_bundle_from_tile_info(
+    tile: Option<&TilesetRectangle>,
     tileset_map: &TilesetMap,
     tileset_definition_map: &HashMap<i32, &TilesetDefinition>,
     texture_atlases: &mut Assets<TextureAtlas>,
 ) -> SpriteSheetBundle {
-    let (tileset, tileset_definition) = if let Some(t) = &entity_instance.tile {
+    let (tileset, tileset_definition) = if let Some(t) = tile {
         (
             tileset_map.get(&t.tileset_uid),
             tileset_definition_map.get(&t.tileset_uid).copied(),
@@ -323,7 +323,7 @@ pub fn sprite_sheet_bundle_from_entity_info(
     } else {
         (None, None)
     };
-    match (tileset, &entity_instance.tile, tileset_definition) {
+    match (tileset, tile, tileset_definition) {
         (Some(tileset), Some(tile), Some(tileset_definition)) => SpriteSheetBundle {
             texture_atlas: texture_atlases.add(TextureAtlas::from_grid(
                 tileset.clone(),
@@ -348,19 +348,16 @@ pub fn sprite_sheet_bundle_from_entity_info(
     }
 }
 
-/// Creates a [SpriteBundle] from the entity information available to the
+/// Creates a [SpriteBundle] from the tile information available to the
 /// [LdtkEntity::bundle_entity] method.
 ///
 /// Used for the `#[sprite_bundle]` attribute macro for `#[derive(LdtkEntity)]`.
 /// See [LdtkEntity#sprite_bundle] for more info.
-pub fn sprite_bundle_from_entity_info(
-    entity_instance: &EntityInstance,
+pub fn sprite_bundle_from_tile_info(
+    tile: Option<&TilesetRectangle>,
     tileset_map: &TilesetMap,
 ) -> SpriteBundle {
-    let tileset = entity_instance
-        .tile
-        .as_ref()
-        .and_then(|t| tileset_map.get(&t.tileset_uid));
+    let tileset = tile.and_then(|t| tileset_map.get(&t.tileset_uid));
     let tileset = match tileset {
         Some(tileset) => tileset.clone(),
         None => {
