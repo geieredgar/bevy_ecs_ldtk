@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use bevy_rapier2d::prelude::*;
 
-#[derive(Clone, Debug, Default, Bundle, LdtkIntCell)]
+#[derive(Clone, Debug, Default, Bundle)]
 pub struct ColliderBundle {
     pub collider: Collider,
     pub rigid_body: RigidBody,
@@ -16,7 +16,7 @@ pub struct ColliderBundle {
     pub density: ColliderMassProperties,
 }
 
-#[derive(Clone, Debug, Default, Bundle, LdtkIntCell)]
+#[derive(Clone, Debug, Default, Bundle)]
 pub struct SensorBundle {
     pub collider: Collider,
     pub sensor: Sensor,
@@ -114,46 +114,63 @@ pub struct Climber {
     pub intersecting_climbables: HashSet<Entity>,
 }
 
-#[derive(Clone, Default, Bundle, LdtkEntity)]
+#[derive(Clone, Default, Bundle, Spawn)]
+#[context(EntityInput)]
 pub struct PlayerBundle {
-    #[sprite_bundle("player.png")]
+    //#[sprite_bundle("player.png")]
     #[bundle]
     pub sprite_bundle: SpriteBundle,
-    #[from_entity_instance]
+    #[pre(entity_instance)]
+    #[with(ColliderBundle::from)]
     #[bundle]
     pub collider_bundle: ColliderBundle,
+    #[default_value]
     pub player: Player,
-    #[worldly]
     pub worldly: Worldly,
+    #[default_value]
     pub climber: Climber,
+    #[default_value]
     pub ground_detection: GroundDetection,
 
     // Build Items Component manually by using `impl From<&EntityInstance>`
-    #[from_entity_instance]
+    #[pre(entity_instance)]
+    #[with(Items::from)]
     items: Items,
 
     // The whole EntityInstance can be stored directly as an EntityInstance component
-    #[from_entity_instance]
     entity_instance: EntityInstance,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
 pub struct Wall;
 
-#[derive(Clone, Debug, Default, Bundle, LdtkIntCell)]
+#[derive(Clone, Debug, Default, Bundle, Spawn)]
+#[context(IntCellInput)]
 pub struct WallBundle {
+    #[default_value]
     wall: Wall,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
 pub struct Climbable;
 
-#[derive(Clone, Debug, Default, Bundle, LdtkIntCell)]
+#[derive(Clone, Debug, Default, Bundle, Spawn)]
+#[context(IntCellInput)]
 pub struct LadderBundle {
-    #[from_int_grid_cell]
     #[bundle]
+    #[pre(int_grid_cell)]
+    #[with(SensorBundle::from)]
     pub sensor_bundle: SensorBundle,
+    #[default_value]
     pub climbable: Climbable,
+}
+
+fn int_grid_cell(input: &mut IntCellInput) -> IntGridCell {
+    input.int_grid_cell
+}
+
+fn entity_instance<'a>(input: &'a mut EntityInput) -> &'a EntityInstance {
+    input.entity_instance
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Component)]
@@ -166,12 +183,14 @@ pub struct Patrol {
     pub forward: bool,
 }
 
-impl LdtkEntity for Patrol {
-    fn bundle_entity(context: LdtkEntityContext) -> Patrol {
+impl Spawn for Patrol {
+    type Context<'a> = EntityInput<'a>;
+
+    fn spawn(context: EntityInput) -> Patrol {
         let mut points = Vec::new();
         points.push(ldtk_pixel_coords_to_translation_pivoted(
             context.entity_instance.px,
-            context.layer_instance.c_hei * context.layer_instance.grid_size,
+            context.context.layer_instance.c_hei * context.context.layer_instance.grid_size,
             IVec2::new(
                 context.entity_instance.width,
                 context.entity_instance.height,
@@ -194,11 +213,12 @@ impl LdtkEntity for Patrol {
                     // but technically they're not if you consider the pivot,
                     // which is at the bottom-center for the skulls.
                     let pixel_coords = (ldtk_point.as_vec2() + Vec2::new(0.5, 1.))
-                        * Vec2::splat(context.layer_instance.grid_size as f32);
+                        * Vec2::splat(context.context.layer_instance.grid_size as f32);
 
                     points.push(ldtk_pixel_coords_to_translation_pivoted(
                         pixel_coords.as_ivec2(),
-                        context.layer_instance.c_hei * context.layer_instance.grid_size,
+                        context.context.layer_instance.c_hei
+                            * context.context.layer_instance.grid_size,
                         IVec2::new(
                             context.entity_instance.width,
                             context.entity_instance.height,
@@ -217,25 +237,27 @@ impl LdtkEntity for Patrol {
     }
 }
 
-#[derive(Clone, Default, Bundle, LdtkEntity)]
+#[derive(Clone, Default, Bundle, Spawn)]
+#[context(EntityInput)]
 pub struct MobBundle {
-    #[sprite_sheet_bundle]
     #[bundle]
     pub sprite_sheet_bundle: SpriteSheetBundle,
-    #[from_entity_instance]
+    #[pre(entity_instance)]
+    #[with(ColliderBundle::from)]
     #[bundle]
     pub collider_bundle: ColliderBundle,
+    #[default_value]
     pub enemy: Enemy,
-    #[ldtk_entity]
     pub patrol: Patrol,
 }
 
-#[derive(Clone, Default, Bundle, LdtkEntity)]
+#[derive(Clone, Default, Bundle, Spawn)]
+#[context(EntityInput)]
 pub struct ChestBundle {
-    #[sprite_sheet_bundle]
     #[bundle]
     pub sprite_sheet_bundle: SpriteSheetBundle,
-    #[from_entity_instance]
+    #[pre(entity_instance)]
+    #[with(ColliderBundle::from)]
     #[bundle]
     pub collider_bundle: ColliderBundle,
 }

@@ -4,12 +4,12 @@ use crate::{
     utils, TilesetMap,
 };
 use bevy::{ecs::system::EntityCommands, prelude::*};
-use std::{collections::HashMap, marker::PhantomData};
+use std::{
+    collections::{HashMap, HashSet},
+    marker::PhantomData,
+};
 
-#[allow(unused_imports)]
-use crate::app::register_ldtk_objects::RegisterLdtkObjects;
-
-use super::LdtkFieldContext;
+use super::{DefaultFieldContext, Spawn};
 
 /// [Bundle]: bevy::prelude::Bundle
 /// [App]: bevy::prelude::App
@@ -285,7 +285,7 @@ use super::LdtkFieldContext;
 ///     }
 /// }
 /// ```
-pub trait LdtkEntity {
+pub trait LdtkEntity: UsesEntityContext {
     /// The constructor used by the plugin when spawning entities from an LDtk file.
     /// Has access to resources/assets most commonly used for spawning 2d objects.
     /// If you need access to more of the [World](bevy::prelude::World), you can create a system that queries for
@@ -298,10 +298,14 @@ pub trait LdtkEntity {
     /// [SpatialBundle](bevy::prelude::SpatialBundle) to the entity **after** this bundle is
     /// inserted.
     /// So, any custom implementations of these components within this trait will be overwritten.
-    fn bundle_entity(context: LdtkEntityContext) -> Self;
+    fn bundle_entity(context: Self::Context<'_>) -> Self;
 }
 
-pub struct LdtkEntityContext<'a> {
+pub trait UsesEntityContext {
+    type Context<'a>;
+}
+
+pub struct DefaultEntityContext<'a> {
     pub entity_instance: &'a EntityInstance,
     pub layer_instance: &'a LayerInstance,
     pub tileset_map: &'a TilesetMap,
@@ -310,22 +314,30 @@ pub struct LdtkEntityContext<'a> {
     pub texture_atlases: &'a mut Assets<TextureAtlas>,
 }
 
-impl<'a> LdtkEntityContext<'a> {
-    pub fn reborrow(&mut self) -> LdtkEntityContext {
-        LdtkEntityContext {
-            entity_instance: self.entity_instance,
-            layer_instance: self.layer_instance,
-            tileset_map: self.tileset_map,
-            tileset_definition_map: self.tileset_definition_map,
-            asset_server: self.asset_server,
-            texture_atlases: self.texture_atlases,
+impl<'a, 'b> From<&'a mut DefaultEntityContext<'b>> for () {
+    fn from(_: &'a mut DefaultEntityContext<'b>) -> Self {
+        ()
+    }
+}
+
+impl<'a, 'b> From<&'a mut DefaultEntityContext<'b>> for DefaultEntityContext<'a> {
+    fn from(value: &'a mut DefaultEntityContext<'b>) -> Self {
+        Self {
+            entity_instance: value.entity_instance,
+            layer_instance: value.layer_instance,
+            tileset_map: value.tileset_map,
+            tileset_definition_map: value.tileset_definition_map,
+            asset_server: value.asset_server,
+            texture_atlases: value.texture_atlases,
         }
     }
+}
 
-    pub fn field(&mut self, identifier: &str) -> Option<LdtkFieldContext> {
+impl<'a> DefaultEntityContext<'a> {
+    pub fn field(&mut self, identifier: &str) -> Option<DefaultFieldContext> {
         for field_instance in &self.entity_instance.field_instances {
             if field_instance.identifier == identifier {
-                return Some(LdtkFieldContext {
+                return Some(DefaultFieldContext {
                     field_instance,
                     entity_instance: self.entity_instance,
                     layer_instance: self.layer_instance,
@@ -340,77 +352,108 @@ impl<'a> LdtkEntityContext<'a> {
     }
 }
 
-impl LdtkEntity for EntityInstanceBundle {
-    fn bundle_entity(context: LdtkEntityContext) -> Self {
-        EntityInstanceBundle {
-            entity_instance: context.entity_instance.clone(),
-        }
+impl<'a, 'b> From<&'a mut DefaultEntityContext<'b>> for &'a EntityInstance {
+    fn from(value: &'a mut DefaultEntityContext<'b>) -> Self {
+        value.entity_instance
     }
+}
+
+impl<'a, 'b> From<&'a mut DefaultEntityContext<'b>> for EntityInstance {
+    fn from(value: &'a mut DefaultEntityContext<'b>) -> Self {
+        value.entity_instance.clone()
+    }
+}
+
+impl<'a, 'b> From<&'a mut DefaultEntityContext<'b>> for SpriteBundleEntityContext<'a> {
+    fn from(value: &'a mut DefaultEntityContext<'b>) -> Self {
+        (value.entity_instance, value.tileset_map)
+    }
+}
+
+impl<'a, 'b> From<&'a mut DefaultEntityContext<'b>> for GridCoordsEntityContext<'a> {
+    fn from(value: &'a mut DefaultEntityContext<'b>) -> Self {
+        (value.entity_instance, value.layer_instance)
+    }
+}
+
+impl<'a, 'b> From<&'a mut DefaultEntityContext<'b>> for SpriteSheetBundleEntityContext<'a> {
+    fn from(value: &'a mut DefaultEntityContext<'b>) -> Self {
+        (
+            value.entity_instance,
+            value.tileset_map,
+            value.tileset_definition_map,
+            value.texture_atlases,
+        )
+    }
+}
+
+impl UsesEntityContext for EntityInstanceBundle {
+    type Context<'a> = EntityInstance;
+}
+
+impl LdtkEntity for EntityInstanceBundle {
+    fn bundle_entity(entity_instance: EntityInstance) -> Self {
+        EntityInstanceBundle { entity_instance }
+    }
+}
+
+pub type SpriteBundleEntityContext<'a> = (&'a EntityInstance, &'a TilesetMap);
+
+impl UsesEntityContext for SpriteBundle {
+    type Context<'a> = SpriteBundleEntityContext<'a>;
 }
 
 impl LdtkEntity for SpriteBundle {
-    fn bundle_entity(context: LdtkEntityContext) -> Self {
-        utils::sprite_bundle_from_tile_info(
-            context.entity_instance.tile.as_ref(),
-            context.tileset_map,
-        )
+    fn bundle_entity((entity_instance, tileset_map): (&EntityInstance, &TilesetMap)) -> Self {
+        utils::sprite_bundle_from_tile_info(entity_instance.tile.as_ref(), tileset_map)
     }
+}
+
+pub type SpriteSheetBundleEntityContext<'a> = (
+    &'a EntityInstance,
+    &'a TilesetMap,
+    &'a HashMap<i32, &'a TilesetDefinition>,
+    &'a mut Assets<TextureAtlas>,
+);
+
+impl UsesEntityContext for SpriteSheetBundle {
+    type Context<'a> = SpriteSheetBundleEntityContext<'a>;
 }
 
 impl LdtkEntity for SpriteSheetBundle {
-    fn bundle_entity(context: LdtkEntityContext) -> Self {
+    fn bundle_entity(
+        (entity_instance, tileset_map, tileset_definition_map, texture_atlases): Self::Context<'_>,
+    ) -> Self {
         utils::sprite_sheet_bundle_from_tile_info(
-            context.entity_instance.tile.as_ref(),
-            context.tileset_map,
-            context.tileset_definition_map,
-            context.texture_atlases,
+            entity_instance.tile.as_ref(),
+            tileset_map,
+            tileset_definition_map,
+            texture_atlases,
         )
     }
 }
 
+impl UsesEntityContext for Worldly {
+    type Context<'a> = &'a EntityInstance;
+}
+
 impl LdtkEntity for Worldly {
-    fn bundle_entity(context: LdtkEntityContext) -> Worldly {
-        Worldly::from_entity_info(context.entity_instance)
+    fn bundle_entity(entity_instance: &EntityInstance) -> Worldly {
+        Worldly::from_entity_info(entity_instance)
     }
+}
+
+pub type GridCoordsEntityContext<'a> = (&'a EntityInstance, &'a LayerInstance);
+
+impl UsesEntityContext for GridCoords {
+    type Context<'a> = GridCoordsEntityContext<'a>;
 }
 
 impl LdtkEntity for GridCoords {
-    fn bundle_entity(context: LdtkEntityContext) -> Self {
-        GridCoords::from_entity_info(context.entity_instance, context.layer_instance)
-    }
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Hash)]
-pub struct PhantomLdtkEntity<B: LdtkEntity + Bundle> {
-    ldtk_entity: PhantomData<B>,
-}
-
-impl<B: LdtkEntity + Bundle> PhantomLdtkEntity<B> {
-    pub fn new() -> Self {
-        PhantomLdtkEntity::<B> {
-            ldtk_entity: PhantomData,
-        }
-    }
-}
-
-pub trait PhantomLdtkEntityTrait {
-    #[allow(clippy::too_many_arguments)]
-    fn evaluate<'w, 's, 'a, 'b>(
-        &self,
-        commands: &'b mut EntityCommands<'w, 's, 'a>,
-        context: LdtkEntityContext,
-    ) -> &'b mut EntityCommands<'w, 's, 'a>;
-}
-
-impl<B: LdtkEntity + Bundle> PhantomLdtkEntityTrait for PhantomLdtkEntity<B> {
-    fn evaluate<'w, 's, 'a, 'b>(
-        &self,
-        entity_commands: &'b mut EntityCommands<'w, 's, 'a>,
-        context: LdtkEntityContext,
-    ) -> &'b mut EntityCommands<'w, 's, 'a> {
-        entity_commands.insert(B::bundle_entity(context))
+    fn bundle_entity((entity_instance, layer_instance): Self::Context<'_>) -> Self {
+        GridCoords::from_entity_info(entity_instance, layer_instance)
     }
 }
 
 /// Used by [RegisterLdtkObjects] to associate Ldtk entity identifiers with [LdtkEntity]s.
-pub type LdtkEntityMap = HashMap<(Option<String>, Option<String>), Box<dyn PhantomLdtkEntityTrait>>;
+pub type LdtkEntityMap = HashMap<(Option<String>, Option<String>), usize>;

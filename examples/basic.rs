@@ -6,10 +6,10 @@ fn main() {
         .add_plugins(
             DefaultPlugins.set(ImagePlugin::default_nearest()), // prevents blurry sprites
         )
-        .add_plugin(LdtkPlugin)
+        .add_plugin(LdtkPlugin(|spawner| spawner))
         .add_startup_system(setup)
         .insert_resource(LevelSelection::Index(0))
-        .register_ldtk_entity::<MyBundle>("MyEntityIdentifier")
+        //.register_ldtk_entity::<MyBundle>("MyEntityIdentifier")
         .run();
 }
 
@@ -29,6 +29,7 @@ struct ComponentA;
 struct ComponentB;
 
 #[derive(Bundle, LdtkEntity)]
+#[use_default_context]
 pub struct MyBundle {
     a: ComponentA,
     b: ComponentB,

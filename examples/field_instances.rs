@@ -4,10 +4,10 @@ use bevy_ecs_ldtk::prelude::*;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugin(LdtkPlugin)
+        .add_plugin(LdtkPlugin(|spawner| spawner))
         .insert_resource(LevelSelection::default())
         .add_startup_system(setup)
-        .register_ldtk_entity::<EntityWithFieldsBundle>("EntityWithFields")
+        //.register_ldtk_entity::<EntityWithFieldsBundle>("EntityWithFields")
         .run();
 }
 
@@ -29,8 +29,12 @@ struct EntityWithFieldsBundle {
     sprite_bundle: SpriteBundle,
 }
 
+impl UsesEntityContext for EntityWithFieldsBundle {
+    type Context<'a> = DefaultEntityContext<'a>;
+}
+
 impl LdtkEntity for EntityWithFieldsBundle {
-    fn bundle_entity(context: LdtkEntityContext) -> EntityWithFieldsBundle {
+    fn bundle_entity(context: DefaultEntityContext) -> EntityWithFieldsBundle {
         println!("EntityWithFields added, here are some facts:");
         for field_instance in &context.entity_instance.field_instances {
             println!(

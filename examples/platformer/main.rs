@@ -12,7 +12,14 @@ mod systems;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
-        .add_plugin(LdtkPlugin)
+        .add_plugin(LdtkPlugin(|s: Spawner| {
+            s.int_cell::<components::WallBundle>(3)
+                .int_cell::<components::LadderBundle>(2)
+                .int_cell::<components::WallBundle>(1)
+                .entity("Player", from_entity_input::<components::PlayerBundle>())
+                .entity("Mob", from_entity_input::<components::MobBundle>())
+                .entity("Chest", from_entity_input::<components::ChestBundle>())
+        }))
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::pixels_per_meter(100.0))
         .insert_resource(RapierConfiguration {
             gravity: Vec2::new(0.0, -2000.0),
@@ -39,11 +46,11 @@ fn main() {
         .add_system(systems::ground_detection)
         .add_system(systems::update_on_ground)
         .add_system(systems::restart_level)
-        .register_ldtk_int_cell::<components::WallBundle>(1)
-        .register_ldtk_int_cell::<components::LadderBundle>(2)
-        .register_ldtk_int_cell::<components::WallBundle>(3)
-        .register_ldtk_entity::<components::PlayerBundle>("Player")
-        .register_ldtk_entity::<components::MobBundle>("Mob")
-        .register_ldtk_entity::<components::ChestBundle>("Chest")
+        //.register_ldtk_int_cell::<components::WallBundle>(1)
+        //.register_ldtk_int_cell::<components::LadderBundle>(2)
+        //.register_ldtk_int_cell::<components::WallBundle>(3)
+        //.register_ldtk_entity::<components::PlayerBundle>("Player")
+        //.register_ldtk_entity::<components::MobBundle>("Mob")
+        //.register_ldtk_entity::<components::ChestBundle>("Chest")
         .run();
 }

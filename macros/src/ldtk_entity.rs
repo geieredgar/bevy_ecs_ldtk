@@ -8,9 +8,15 @@ static LDTK_ENTITY_ATTRIBUTE_NAME: &str = "ldtk_entity";
 static FROM_ENTITY_INSTANCE_ATTRIBUTE_NAME: &str = "from_entity_instance";
 static LDTK_FIELD_ATTRIBUTE_NAME: &str = "ldtk_field";
 static WITH_ATTRIBUTE_NAME: &str = "with";
+static USE_DEFAULT_CONTEXT_ATTRIBUTE_NAME: &str = "use_default_context";
 
 pub fn expand_ldtk_entity_derive(ast: &syn::DeriveInput) -> proc_macro::TokenStream {
     let struct_name = &ast.ident;
+
+    let use_default_context = ast
+        .attrs
+        .iter()
+        .any(|a| *a.path.get_ident().as_ref().unwrap() == USE_DEFAULT_CONTEXT_ATTRIBUTE_NAME);
 
     let fields = match &ast.data {
         syn::Data::Struct(syn::DataStruct {
@@ -117,9 +123,20 @@ pub fn expand_ldtk_entity_derive(ast: &syn::DeriveInput) -> proc_macro::TokenStr
     let generics = &ast.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
+    let uses_context = if use_default_context {
+        quote!(
+            impl #impl_generics bevy_ecs_ldtk::prelude::UsesEntityContext for #struct_name #ty_generics #where_clause {
+                type Context<'a> = bevy_ecs_ldtk::prelude::DefaultEntityContext<'a>;
+            }
+        )
+    } else {
+        quote! {}
+    };
     let gen = quote! {
+        #uses_context
+
         impl #impl_generics bevy_ecs_ldtk::prelude::LdtkEntity for #struct_name #ty_generics #where_clause {
-            fn bundle_entity(mut context: bevy_ecs_ldtk::prelude::LdtkEntityContext) -> Self {
+            fn bundle_entity(mut context: Self::Context<'_>) -> Self {
                 Self {
                     #(#field_constructions)*
                 }
@@ -167,7 +184,7 @@ fn expand_sprite_bundle_attribute(
         },
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: bevy_ecs_ldtk::utils::sprite_bundle_from_tile_info(context.entity_instance.tile.as_ref(), context.tileset_map),
+                #field_name: <#field_type as bevy_ecs_ldtk::prelude::LdtkEntity>::bundle_entity((&mut context).into()),
             }
         },
         _ => panic!("#[sprite_bundle...] attribute should take the form #[sprite_bundle(\"asset/path.png\")] or #[sprite_bundle]"),
@@ -251,7 +268,7 @@ fn expand_sprite_sheet_bundle_attribute(
         },
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: bevy_ecs_ldtk::utils::sprite_sheet_bundle_from_tile_info(context.entity_instance.tile.as_ref(), context.tileset_map, context.tileset_definition_map, context.texture_atlases),
+                #field_name: <#field_type as bevy_ecs_ldtk::prelude::LdtkEntity>::bundle_entity((&mut context).into()),
             }
         },
         _ => panic!("#[sprite_sheet_bundle...] attribute should take the form #[sprite_sheet_bundle(\"asset/path.png\", tile_width, tile_height, columns, rows, padding, offset, index)] or #[sprite_sheet_bundle]"),
@@ -261,7 +278,7 @@ fn expand_sprite_sheet_bundle_attribute(
 fn expand_worldly_attribute(
     attribute: &syn::Attribute,
     field_name: &syn::Ident,
-    _: &syn::Type,
+    field_type: &syn::Type,
 ) -> proc_macro2::TokenStream {
     match attribute
         .parse_meta()
@@ -269,7 +286,7 @@ fn expand_worldly_attribute(
     {
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: bevy_ecs_ldtk::prelude::Worldly::from_entity_info(context.entity_instance),
+                #field_name: <#field_type as bevy_ecs_ldtk::prelude::LdtkEntity>::bundle_entity((&mut context).into()),
             }
         }
         _ => panic!("#[worldly] attribute should take the form #[worldly]"),
@@ -279,7 +296,7 @@ fn expand_worldly_attribute(
 fn expand_grid_coords_attribute(
     attribute: &syn::Attribute,
     field_name: &syn::Ident,
-    _: &syn::Type,
+    field_type: &syn::Type,
 ) -> proc_macro2::TokenStream {
     match attribute
         .parse_meta()
@@ -287,7 +304,7 @@ fn expand_grid_coords_attribute(
     {
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: bevy_ecs_ldtk::prelude::GridCoords::from_entity_info(context.entity_instance, context.layer_instance),
+                #field_name: <#field_type as bevy_ecs_ldtk::prelude::LdtkEntity>::bundle_entity((&mut context).into()),
             }
         }
         _ => panic!("#[grid_coords] attribute should take the form #[grid_coords]"),
@@ -305,7 +322,7 @@ fn expand_ldtk_entity_attribute(
     {
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: <#field_type as bevy_ecs_ldtk::prelude::LdtkEntity>::bundle_entity(context.reborrow()),
+                #field_name: <#field_type as bevy_ecs_ldtk::prelude::LdtkEntity>::bundle_entity((&mut context).into()),
             }
         }
         _ => panic!("#[ldtk_entity] attribute should take the form #[ldtk_entity]"),
@@ -323,7 +340,7 @@ fn expand_from_entity_instance_attribute(
     {
         syn::Meta::Path(_) => {
             quote! {
-                #field_name: <#field_type as From<&bevy_ecs_ldtk::prelude::EntityInstance>>::from(context.entity_instance),
+                #field_name: <#field_type as From<&bevy_ecs_ldtk::prelude::EntityInstance>>::from((&mut context).into()),
             }
         }
         _ => {
@@ -374,11 +391,11 @@ fn expand_ldtk_field_attribute(
             "EntityInstance does not contain a FieldInstance with identifier \"{identifier}\""
         );
         quote! {
-            #field_name: context.field(#identifier).map(<#field_type as bevy_ecs_ldtk::prelude::LdtkField>::bundle_field).expect(#message),
+            #field_name: context.field(#identifier).map(Into::into).map(<#field_type as bevy_ecs_ldtk::prelude::LdtkField>::bundle_field).expect(#message),
         }
     } else {
         quote! {
-            #field_name: context.field(#identifier).map(<#field_type as bevy_ecs_ldtk::prelude::LdtkField>::bundle_field).unwrap_or_default(),
+            #field_name: context.field(#identifier).map(Into::into).map(<#field_type as bevy_ecs_ldtk::prelude::LdtkField>::bundle_field).unwrap_or_default(),
         }
     }
 }
@@ -396,7 +413,7 @@ fn expand_with_attribute(
             match nested.first().unwrap() {
                 syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
                     quote! {
-                        #field_name: #path(context.entity_instance),
+                        #field_name: #path((&mut context).into()),
                     }
                 }
                 _ => panic!("Expected function as the only argument of #[with(...)]"),

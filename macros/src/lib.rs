@@ -2,10 +2,12 @@ use proc_macro::TokenStream;
 
 mod ldtk_entity;
 mod ldtk_int_cell;
+mod spawn;
 
 #[proc_macro_derive(
     LdtkEntity,
     attributes(
+        use_default_context,
         sprite_bundle,
         sprite_sheet_bundle,
         worldly,
@@ -27,4 +29,14 @@ pub fn ldtk_int_cell_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();
 
     ldtk_int_cell::expand_ldtk_int_cell_derive(&ast)
+}
+
+#[proc_macro_derive(
+    Spawn,
+    attributes(context, pre, with, default_value, post, field, no_lifetime)
+)]
+pub fn spawn_derive(input: TokenStream) -> TokenStream {
+    let ast = syn::parse(input).unwrap();
+
+    spawn::expand_spawn_derive(&ast)
 }

@@ -3,9 +3,9 @@
 mod ldtk_entity;
 mod ldtk_field;
 mod ldtk_int_cell;
-mod register_ldtk_objects;
+mod spawn;
 
 pub use ldtk_entity::*;
 pub use ldtk_field::*;
 pub use ldtk_int_cell::*;
-pub use register_ldtk_objects::*;
+pub use spawn::*;

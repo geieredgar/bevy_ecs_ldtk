@@ -1,10 +1,7 @@
 //! Functions related to spawning levels.
 
 use crate::{
-    app::{
-        LdtkEntity, LdtkEntityContext, LdtkEntityMap, LdtkIntCellMap, PhantomLdtkEntity,
-        PhantomLdtkEntityTrait, PhantomLdtkIntCell, PhantomLdtkIntCellTrait,
-    },
+    app::{EntityInput, IntCellInput, LayerSpawnContext, LdtkEntity},
     assets::{LdtkLevel, TilesetMap},
     components::*,
     ldtk::{
@@ -12,11 +9,12 @@ use crate::{
         TileCustomMetadata, TileInstance, TilesetDefinition, Type,
     },
     resources::{IntGridRendering, LdtkSettings, LevelBackground},
+    spawner::{EntitySpawner, IntCellSpawner, Spawner},
     tile_makers::*,
     utils::*,
 };
 
-use bevy::{prelude::*, render::render_resource::*};
+use bevy::{ecs::system::SystemParamItem, prelude::*, render::render_resource::*};
 use bevy_ecs_tilemap::{
     map::{
         TilemapGridSize, TilemapId, TilemapSize, TilemapSpacing, TilemapTexture, TilemapTileSize,
@@ -173,7 +171,7 @@ fn insert_tile_metadata_for_layer(
     }
 }
 
-fn layer_grid_tiles(grid_tiles: Vec<TileInstance>) -> Vec<Vec<TileInstance>> {
+pub fn layer_grid_tiles(grid_tiles: Vec<TileInstance>) -> Vec<Vec<TileInstance>> {
     let mut layer = Vec::new();
     let mut overflow = Vec::new();
     for tile in grid_tiles {
@@ -192,7 +190,7 @@ fn layer_grid_tiles(grid_tiles: Vec<TileInstance>) -> Vec<Vec<TileInstance>> {
     layered_grid_tiles
 }
 
-fn tile_in_layer_bounds(tile: &TileInstance, layer_instance: &LayerInstance) -> bool {
+pub fn tile_in_layer_bounds(tile: &TileInstance, layer_instance: &LayerInstance) -> bool {
     tile.px.x >= 0
         && tile.px.y >= 0
         && tile.px.x < (layer_instance.c_wid * layer_instance.grid_size)
@@ -200,14 +198,17 @@ fn tile_in_layer_bounds(tile: &TileInstance, layer_instance: &LayerInstance) -> 
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn spawn_level(
+pub fn spawn_level<E: EntitySpawner, I: IntCellSpawner>(
+    spawner: &mut Spawner<E, I>,
+    param: &mut ParamSet<(
+        SystemParamItem<E::Param<'_, '_>>,
+        SystemParamItem<I::Param<'_, '_>>,
+    )>,
+    asset_server: &AssetServer,
     ldtk_level: &LdtkLevel,
     commands: &mut Commands,
-    asset_server: &AssetServer,
     images: &mut Assets<Image>,
     texture_atlases: &mut Assets<TextureAtlas>,
-    ldtk_entity_map: &LdtkEntityMap,
-    ldtk_int_cell_map: &LdtkIntCellMap,
     entity_definition_map: &HashMap<i32, &EntityDefinition>,
     layer_definition_map: &HashMap<i32, &LayerDefinition>,
     tileset_map: &TilesetMap,
@@ -217,7 +218,6 @@ pub fn spawn_level(
     ldtk_settings: &LdtkSettings,
 ) {
     let level = &ldtk_level.level;
-
     if let Some(layer_instances) = &level.layer_instances {
         let mut layer_z = 0;
 
@@ -302,6 +302,7 @@ pub fn spawn_level(
         for layer_instance in layer_instances.iter().rev() {
             match layer_instance.layer_instance_type {
                 Type::Entities => {
+                    println!("Default Spawn at z={}", layer_z);
                     commands.entity(ldtk_entity).with_children(|commands| {
                         for entity_instance in &layer_instance.entity_instances {
                             let transform = calculate_transform_from_entity_instance(
@@ -313,36 +314,32 @@ pub fn spawn_level(
                             // Note: entities do not seem to be affected visually by layer offsets in
                             // the editor, so no layer offset is added to the transform here.
 
-                            let predicted_worldly = Worldly::bundle_entity(LdtkEntityContext {
-                                entity_instance,
-                                layer_instance,
-                                tileset_map,
-                                tileset_definition_map,
-                                asset_server,
-                                texture_atlases,
-                            });
+                            let predicted_worldly = Worldly::bundle_entity(entity_instance);
 
                             if !worldly_set.contains(&predicted_worldly) {
-                                let default_ldtk_entity: Box<dyn PhantomLdtkEntityTrait> =
-                                    Box::new(PhantomLdtkEntity::<EntityInstanceBundle>::new());
                                 let mut entity_commands = commands.spawn_empty();
 
-                                ldtk_map_get_or_default(
+                                let index = *ldtk_map_get_or_default(
                                     layer_instance.identifier.clone(),
                                     entity_instance.identifier.clone(),
-                                    &default_ldtk_entity,
-                                    ldtk_entity_map,
-                                )
-                                .evaluate(
+                                    &0,
+                                    &spawner.entity_map,
+                                );
+
+                                spawner.entity_dispatcher.spawn(
+                                    index,
                                     &mut entity_commands,
-                                    LdtkEntityContext {
+                                    EntityInput {
                                         entity_instance,
-                                        layer_instance,
-                                        tileset_map,
-                                        tileset_definition_map,
-                                        asset_server,
-                                        texture_atlases,
+                                        context: LayerSpawnContext {
+                                            asset_server,
+                                            layer_instance,
+                                            tileset_definition_map,
+                                            tileset_map,
+                                            texture_atlases,
+                                        },
                                     },
+                                    param.p0(),
                                 );
 
                                 entity_commands
@@ -357,6 +354,7 @@ pub fn spawn_level(
                     layer_z += 1;
                 }
                 _ => {
+                    println!("Default Tile Spawn at z={}", layer_z);
                     // The remaining layers have a lot of shared code.
                     // This is because:
                     // 1. There is virtually no difference between AutoTile and Tile layers
@@ -567,19 +565,26 @@ pub fn spawn_level(
 
                                     let mut entity_commands = commands.entity(tile_entity);
 
-                                    let default_ldtk_int_cell: Box<dyn PhantomLdtkIntCellTrait> =
-                                        Box::new(PhantomLdtkIntCell::<IntGridCellBundle>::new());
-
-                                    ldtk_map_get_or_default(
+                                    let index = *ldtk_map_get_or_default(
                                         layer_instance.identifier.clone(),
                                         *value,
-                                        &default_ldtk_int_cell,
-                                        ldtk_int_cell_map,
-                                    )
-                                    .evaluate(
+                                        &0,
+                                        &spawner.int_cell_map,
+                                    );
+                                    spawner.int_cell_dispatcher.spawn(
+                                        index,
                                         &mut entity_commands,
-                                        IntGridCell { value: *value },
-                                        layer_instance,
+                                        IntCellInput {
+                                            int_grid_cell: IntGridCell { value: *value },
+                                            context: LayerSpawnContext {
+                                                layer_instance,
+                                                tileset_map,
+                                                tileset_definition_map,
+                                                asset_server,
+                                                texture_atlases,
+                                            },
+                                        },
+                                        param.p1(),
                                     );
                                 }
                             }

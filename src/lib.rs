@@ -105,6 +105,7 @@ mod components;
 pub mod ldtk;
 mod level;
 mod resources;
+mod spawner;
 pub mod systems;
 mod tile_makers;
 pub mod utils;
@@ -119,6 +120,8 @@ pub use bevy_ecs_ldtk_macros::*;
 
 mod plugin {
     //! Provides [LdtkPlugin] and its scheduling-related dependencies.
+
+    use crate::spawner::{DefaultSpawner, EntitySpawner, IntCellSpawner, Spawner};
 
     use super::*;
 
@@ -153,9 +156,20 @@ mod plugin {
     ///
     /// Add it to your [App] to gain LDtk functionality!
     #[derive(Copy, Clone, Debug, Default)]
-    pub struct LdtkPlugin;
+    pub struct LdtkPlugin<
+        E: EntitySpawner + Send + Sync + 'static,
+        I: IntCellSpawner + Send + Sync + 'static,
+        F: Fn(Spawner<DefaultSpawner, DefaultSpawner>) -> Spawner<E, I> + Sync + Send + 'static,
+    >(pub F);
 
-    impl Plugin for LdtkPlugin {
+    impl<
+            'w,
+            's,
+            E: EntitySpawner + Send + Sync + 'static,
+            I: IntCellSpawner + Send + Sync + 'static,
+            F: Fn(Spawner<DefaultSpawner, DefaultSpawner>) -> Spawner<E, I> + Sync + Send + 'static,
+        > Plugin for LdtkPlugin<E, I, F>
+    {
         fn build(&self, mut app: &mut App) {
             // Check if we have added the TileMap plugin
             if !app.is_plugin_added::<bevy_ecs_tilemap::TilemapPlugin>() {
@@ -167,8 +181,6 @@ mod plugin {
                 LdtkStage::ProcessApi,
                 SystemStage::parallel(),
             )
-            .init_non_send_resource::<app::LdtkEntityMap>()
-            .init_non_send_resource::<app::LdtkIntCellMap>()
             .init_resource::<resources::LdtkSettings>()
             .add_asset::<assets::LdtkAsset>()
             .init_asset_loader::<assets::LdtkLoader>()
@@ -181,7 +193,7 @@ mod plugin {
             )
             .add_system_to_stage(
                 CoreStage::PreUpdate,
-                systems::process_ldtk_levels.label(LdtkSystemLabel::LevelSpawning),
+                self.0(Spawner::default()).label(LdtkSystemLabel::LevelSpawning),
             )
             .add_system_to_stage(
                 LdtkStage::ProcessApi,
@@ -220,8 +232,9 @@ pub mod prelude {
 
     pub use crate::{
         app::{
-            LdtkEntity, LdtkEntityContext, LdtkField, LdtkFieldContext, LdtkIntCell,
-            RegisterLdtkObjects,
+            from_entity_input, DefaultEntityContext, DefaultFieldContext, EntityInput,
+            IntCellInput, LdtkEntity, LdtkField, LdtkIntCell, Spawn, SpriteBundleEntityContext,
+            UsesEntityContext,
         },
         assets::{LdtkAsset, LdtkLevel},
         components::{
@@ -234,8 +247,9 @@ pub mod prelude {
             IntGridRendering, LdtkSettings, LevelBackground, LevelEvent, LevelSelection,
             LevelSpawnBehavior, SetClearColor,
         },
+        spawner::Spawner,
     };
 
     #[cfg(feature = "derive")]
-    pub use crate::{LdtkEntity, LdtkIntCell};
+    pub use crate::{LdtkEntity, LdtkIntCell, Spawn};
 }

@@ -1,6 +1,8 @@
 use crate::{
     components::{IntGridCell, IntGridCellBundle},
     ldtk::LayerInstance,
+    prelude::TilesetDefinition,
+    EntityInstance, TilesetMap,
 };
 use bevy::{ecs::system::EntityCommands, prelude::*};
 use std::{collections::HashMap, marker::PhantomData};
@@ -147,38 +149,64 @@ impl LdtkIntCell for IntGridCellBundle {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Default, Hash)]
-pub struct PhantomLdtkIntCell<B: LdtkIntCell + Bundle> {
-    ldtk_int_cell: PhantomData<B>,
+pub struct IntCellInput<'a> {
+    pub int_grid_cell: IntGridCell,
+    pub context: LayerSpawnContext<'a>,
 }
 
-impl<B: LdtkIntCell + Bundle> PhantomLdtkIntCell<B> {
-    pub fn new() -> Self {
-        PhantomLdtkIntCell::<B> {
-            ldtk_int_cell: PhantomData,
+impl<'a, 'b> From<&'a mut IntCellInput<'b>> for IntCellInput<'a> {
+    fn from(value: &'a mut IntCellInput<'b>) -> Self {
+        Self {
+            int_grid_cell: value.int_grid_cell,
+            context: (&mut value.context).into(),
         }
     }
 }
 
-pub trait PhantomLdtkIntCellTrait {
-    fn evaluate<'w, 's, 'a, 'b>(
-        &self,
-        entity_commands: &'b mut EntityCommands<'w, 's, 'a>,
-        int_grid_cell: IntGridCell,
-        layer_instance: &LayerInstance,
-    ) -> &'b mut EntityCommands<'w, 's, 'a>;
-}
-
-impl<B: LdtkIntCell + Bundle> PhantomLdtkIntCellTrait for PhantomLdtkIntCell<B> {
-    fn evaluate<'w, 's, 'a, 'b>(
-        &self,
-        entity_commands: &'b mut EntityCommands<'w, 's, 'a>,
-        int_grid_cell: IntGridCell,
-        layer_instance: &LayerInstance,
-    ) -> &'b mut EntityCommands<'w, 's, 'a> {
-        entity_commands.insert(B::bundle_int_cell(int_grid_cell, layer_instance))
+impl<'a, 'b> From<&'a mut EntityInput<'b>> for EntityInput<'a> {
+    fn from(value: &'a mut EntityInput<'b>) -> Self {
+        Self {
+            entity_instance: value.entity_instance,
+            context: (&mut value.context).into(),
+        }
     }
 }
 
+impl<'a, 'b> From<&'a mut EntityInput<'b>> for EntityInstance {
+    fn from(value: &'a mut EntityInput<'b>) -> Self {
+        value.entity_instance.clone()
+    }
+}
+
+impl<'a, 'b> From<&'a mut EntityInput<'b>> for &'a EntityInstance {
+    fn from(value: &'a mut EntityInput<'b>) -> Self {
+        value.entity_instance
+    }
+}
+
+impl<'a, 'b> From<&'a mut LayerSpawnContext<'b>> for LayerSpawnContext<'a> {
+    fn from(value: &'a mut LayerSpawnContext<'b>) -> Self {
+        Self {
+            layer_instance: value.layer_instance,
+            tileset_map: value.tileset_map,
+            tileset_definition_map: value.tileset_definition_map,
+            asset_server: value.asset_server,
+            texture_atlases: value.texture_atlases,
+        }
+    }
+}
+
+pub struct EntityInput<'a> {
+    pub entity_instance: &'a EntityInstance,
+    pub context: LayerSpawnContext<'a>,
+}
+
+pub struct LayerSpawnContext<'a> {
+    pub layer_instance: &'a LayerInstance,
+    pub tileset_map: &'a TilesetMap,
+    pub tileset_definition_map: &'a HashMap<i32, &'a TilesetDefinition>,
+    pub asset_server: &'a AssetServer,
+    pub texture_atlases: &'a mut Assets<TextureAtlas>,
+}
 /// Used by [RegisterLdtkObjects] to associate Ldtk IntGrid values with [LdtkIntCell]s.
-pub type LdtkIntCellMap = HashMap<(Option<String>, Option<i32>), Box<dyn PhantomLdtkIntCellTrait>>;
+pub type LdtkIntCellMap = HashMap<(Option<String>, Option<i32>), usize>;
